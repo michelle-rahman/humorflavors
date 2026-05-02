@@ -14,7 +14,7 @@ function injectContext(prompt: string, context: Record<string, string>): string 
 export async function POST(request: NextRequest) {
   if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json(
-      { message: "GEMINI_API_KEY is not set. Add it to your environment variables." },
+      { message: "GEMINI_API_KEY is not set. Add it to your Vercel environment variables and redeploy." },
       { status: 500 }
     );
   }
@@ -51,10 +51,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Request must include humor_flavor_id and image_url" }, { status: 400 });
   }
 
-  // Fetch steps ordered by order_by
   const { data: steps, error: stepsError } = await supabase
     .from("humor_flavor_steps")
-    .select(`*, llm_input_types ( slug )`)
+    .select("*")
     .eq("humor_flavor_id", humor_flavor_id)
     .order("order_by", { ascending: true });
 
@@ -68,19 +67,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fetch the image as base64 for Gemini inline data
+  // Download image once and reuse across steps
   let imageBase64: string | null = null;
   let imageMimeType = "image/jpeg";
   try {
-    const imgRes = await fetch(image_url);
+    const imgRes = await fetch(image_url, { headers: { "User-Agent": "Mozilla/5.0" } });
     if (imgRes.ok) {
       const ct = imgRes.headers.get("content-type") ?? "image/jpeg";
-      imageMimeType = ct.split(";")[0].trim();
+      imageMimeType = ct.split(";")[0].trim() || "image/jpeg";
       const buf = await imgRes.arrayBuffer();
       imageBase64 = Buffer.from(buf).toString("base64");
     }
   } catch {
-    // fall back to URL-only text reference if image can't be fetched
+    // continue without inline image — URL will be in the prompt text
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -93,46 +92,45 @@ export async function POST(request: NextRequest) {
     for (const step of steps) {
       const systemPrompt = injectContext(step.llm_system_prompt ?? "", context);
       const userPromptText = injectContext(step.llm_user_prompt ?? "", context);
-      const inputSlug: string = step.llm_input_types?.slug ?? "";
-      const isImageStep = inputSlug.toLowerCase().includes("image") || inputSlug.toLowerCase().includes("vision");
 
-      const fullPrompt = [
-        systemPrompt,
-        userPromptText,
-        chainOutput ? `\nPrevious step output:\n${chainOutput}` : "",
-      ].filter(Boolean).join("\n\n");
+      const textParts: string[] = [];
+      if (systemPrompt) textParts.push(systemPrompt);
+      textParts.push(
+        userPromptText || `Generate a funny, creative caption for the image at: ${image_url}`
+      );
+      if (chainOutput) textParts.push(`\nPrevious step output:\n${chainOutput}`);
 
       type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
       const parts: Part[] = [];
 
-      if (isImageStep && imageBase64) {
+      // Always include the image so every step can see it
+      if (imageBase64) {
         parts.push({ inlineData: { mimeType: imageMimeType, data: imageBase64 } });
       }
-      parts.push({ text: fullPrompt });
+      parts.push({ text: textParts.join("\n\n") });
 
       const result = await model.generateContent(parts);
       chainOutput = result.response.text();
-
       context.previousOutput = chainOutput;
       context.step_output = chainOutput;
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "LLM call failed";
-    return NextResponse.json({ message: msg }, { status: 502 });
+    return NextResponse.json({ message: `Gemini error: ${msg}` }, { status: 502 });
   }
 
-  const caption = {
-    id: crypto.randomUUID(),
-    content: chainOutput,
-    humor_flavor_id,
-    image_id: null,
-    caption_request_id: null,
-    is_public: false,
-    profile_id: session.user.id,
-    like_count: 0,
-    created_datetime_utc: new Date().toISOString(),
-    modified_datetime_utc: new Date().toISOString(),
-  };
-
-  return NextResponse.json({ captions: [caption] });
+  return NextResponse.json({
+    captions: [{
+      id: crypto.randomUUID(),
+      content: chainOutput,
+      humor_flavor_id,
+      image_id: null,
+      caption_request_id: null,
+      is_public: false,
+      profile_id: session.user.id,
+      like_count: 0,
+      created_datetime_utc: new Date().toISOString(),
+      modified_datetime_utc: new Date().toISOString(),
+    }],
+  });
 }
