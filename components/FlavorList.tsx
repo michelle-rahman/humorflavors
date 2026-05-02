@@ -19,6 +19,7 @@ export function FlavorList({ initialFlavors }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -58,6 +59,55 @@ export function FlavorList({ initialFlavors }: Props) {
       setShowForm(false);
       router.push(`/flavors/${data.id}`);
     }
+  }
+
+  async function handleDuplicate(flavor: HumorFlavor) {
+    setDuplicatingId(flavor.id);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+
+    // Find a unique slug
+    const baseSlug = `${flavor.slug}-copy`;
+    const existingSlugs = new Set(flavors.map((f) => f.slug));
+    let newSlug = baseSlug;
+    let n = 2;
+    while (existingSlugs.has(newSlug)) { newSlug = `${baseSlug}-${n}`; n++; }
+
+    const { data: newFlavor, error: flavorErr } = await supabase
+      .from("humor_flavors")
+      .insert({
+        slug: newSlug,
+        description: flavor.description ? `${flavor.description} (Duplicated from ${flavor.slug}.)` : null,
+        is_pinned: false,
+        created_by_user_id: userId,
+        modified_by_user_id: userId,
+      })
+      .select()
+      .single();
+
+    if (flavorErr || !newFlavor) { setDuplicatingId(null); return; }
+
+    // Copy steps
+    const { data: steps } = await supabase
+      .from("humor_flavor_steps")
+      .select("*")
+      .eq("humor_flavor_id", flavor.id)
+      .order("order_by", { ascending: true });
+
+    if (steps && steps.length > 0) {
+      await supabase.from("humor_flavor_steps").insert(
+        steps.map(({ id: _id, created_datetime_utc: _c, modified_datetime_utc: _m, ...step }) => ({
+          ...step,
+          humor_flavor_id: newFlavor.id,
+          created_by_user_id: userId,
+          modified_by_user_id: userId,
+        }))
+      );
+    }
+
+    setFlavors([newFlavor as HumorFlavor, ...flavors]);
+    setDuplicatingId(null);
+    router.push(`/flavors/${newFlavor.id}`);
   }
 
   async function handleDelete(id: number) {
@@ -241,6 +291,18 @@ export function FlavorList({ initialFlavors }: Props) {
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
                   Edit
                 </Link>
+                <button
+                  onClick={() => handleDuplicate(flavor)}
+                  disabled={duplicatingId === flavor.id}
+                  className="flex items-center justify-center w-7 h-7 text-zinc-400 dark:text-zinc-600 hover:text-violet-500 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors disabled:opacity-50"
+                  title="Duplicate"
+                >
+                  {duplicatingId === flavor.id ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  )}
+                </button>
                 <button
                   onClick={() => handleDelete(flavor.id)}
                   disabled={deletingId === flavor.id}

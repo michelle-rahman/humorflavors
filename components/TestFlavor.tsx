@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { HumorFlavor, Caption } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
-
 const ACCEPTED = "image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic";
 
 interface Props {
@@ -15,8 +14,9 @@ interface Props {
 }
 
 export function TestFlavor({ flavor, existingCaptions }: Props) {
+  const [imageUrl, setImageUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewSrc, setPreviewSrc] = useState("");
   const [generating, setGenerating] = useState(false);
   const [stepLabel, setStepLabel] = useState("");
   const [captions, setCaptions] = useState(existingCaptions);
@@ -28,7 +28,8 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
 
   function pickFile(f: File) {
     setFile(f);
-    setPreviewUrl(URL.createObjectURL(f));
+    setPreviewSrc(URL.createObjectURL(f));
+    setImageUrl("");
     setResult(null);
     setError("");
   }
@@ -45,9 +46,19 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
     if (f) pickFile(f);
   }
 
+  function handleUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setImageUrl(e.target.value);
+    setFile(null);
+    setPreviewSrc(e.target.value);
+    setResult(null);
+    setError("");
+  }
+
+  const canGenerate = !generating && (!!file || imageUrl.trim().length > 0);
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) return;
+    if (!canGenerate) return;
     setGenerating(true);
     setError("");
     setResult(null);
@@ -61,56 +72,69 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
     }
 
     try {
-      // Step 1: Get presigned upload URL
-      setStepLabel("Step 1/4 — Getting upload URL…");
-      const presignRes = await fetch(`${API}/pipeline/generate-presigned-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ contentType: file.type || "image/jpeg" }),
-      });
-      const presignJson = await presignRes.json().catch(() => ({})) as Record<string, string>;
-      if (!presignRes.ok) {
-        throw new Error(`Step 1 failed (${presignRes.status}): ${presignJson.message ?? presignRes.statusText}`);
-      }
-      const { presignedUrl, cdnUrl } = presignJson;
-      if (!presignedUrl || !cdnUrl) throw new Error("Step 1: API did not return presignedUrl/cdnUrl");
+      let imageId: string;
 
-      // Step 2: Upload image bytes directly to S3
-      setStepLabel("Step 2/4 — Uploading image…");
-      const uploadRes = await fetch(presignedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "image/jpeg" },
-        body: file,
-      });
-      if (!uploadRes.ok) {
-        const body = await uploadRes.text().catch(() => "");
-        throw new Error(`Step 2 (S3 upload) failed (${uploadRes.status}): ${body.slice(0, 200)}`);
+      if (file) {
+        // ── File upload path ──────────────────────────────────────────────
+        setStepLabel("Step 1/4 — Getting upload URL…");
+        const presignRes = await fetch(`${API}/pipeline/generate-presigned-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ contentType: file.type || "image/jpeg" }),
+        });
+        const presignJson = await presignRes.json().catch(() => ({})) as Record<string, string>;
+        if (!presignRes.ok) throw new Error(`Step 1 failed (${presignRes.status}): ${presignJson.message ?? presignRes.statusText}`);
+        const { presignedUrl, cdnUrl } = presignJson;
+        if (!presignedUrl || !cdnUrl) throw new Error("Step 1: API did not return presignedUrl/cdnUrl");
+
+        setStepLabel("Step 2/4 — Uploading image…");
+        const uploadRes = await fetch(presignedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "image/jpeg" },
+          body: file,
+        });
+        if (!uploadRes.ok) {
+          const body = await uploadRes.text().catch(() => "");
+          throw new Error(`Step 2 (S3 upload) failed (${uploadRes.status}): ${body.slice(0, 200)}`);
+        }
+
+        setStepLabel("Step 3/4 — Registering image…");
+        const regRes = await fetch(`${API}/pipeline/upload-image-from-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ imageUrl: cdnUrl, isCommonUse: false }),
+        });
+        const regJson = await regRes.json().catch(() => ({})) as Record<string, string>;
+        if (!regRes.ok) throw new Error(`Step 3 failed (${regRes.status}): ${regJson.message ?? regRes.statusText}`);
+        imageId = regJson.imageId;
+        if (!imageId) throw new Error("Step 3: API did not return imageId");
+
+      } else {
+        // ── URL path: register directly (skips presign + S3 upload) ──────
+        setStepLabel("Step 1/2 — Registering image URL…");
+        const regRes = await fetch(`${API}/pipeline/upload-image-from-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ imageUrl: imageUrl.trim(), isCommonUse: false }),
+        });
+        const regJson = await regRes.json().catch(() => ({})) as Record<string, string>;
+        if (!regRes.ok) throw new Error(`Register failed (${regRes.status}): ${regJson.message ?? regRes.statusText}`);
+        imageId = regJson.imageId;
+        if (!imageId) throw new Error("Register: API did not return imageId");
+        setStepLabel("Step 2/2 — Generating captions…");
       }
 
-      // Step 3: Register image with pipeline
-      setStepLabel("Step 3/4 — Registering image…");
-      const regRes = await fetch(`${API}/pipeline/upload-image-from-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ imageUrl: cdnUrl, isCommonUse: false }),
-      });
-      const regJson = await regRes.json().catch(() => ({})) as Record<string, string>;
-      if (!regRes.ok) {
-        throw new Error(`Step 3 failed (${regRes.status}): ${regJson.message ?? regRes.statusText}`);
-      }
-      const imageId = regJson.imageId;
-      if (!imageId) throw new Error("Step 3: API did not return imageId");
-
-      // Step 4: Generate captions for this flavor
-      setStepLabel("Step 4/4 — Generating captions…");
+      // ── Generate captions ─────────────────────────────────────────────
+      if (!file) { /* label already set */ } else setStepLabel("Step 4/4 — Generating captions…");
       const captionRes = await fetch(`${API}/pipeline/generate-captions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ imageId, humorFlavorId: flavor.id }),
       });
+
       if (!captionRes.ok) {
         const errText = await captionRes.text().catch(() => captionRes.statusText);
-        throw new Error(`Step 4 failed (${captionRes.status}): ${errText.slice(0, 300)}`);
+        throw new Error(`Caption generation failed (${captionRes.status}): ${errText.slice(0, 300)}`);
       }
 
       const rawText = await captionRes.text();
@@ -121,7 +145,6 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
           ? parsed
           : (parsed as { captions?: Caption[] }).captions ?? [parsed as Caption];
       } catch {
-        // API returned plain text — wrap it as a single caption
         newCaptions = [{
           id: crypto.randomUUID(),
           content: rawText,
@@ -169,32 +192,58 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
         <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Generate captions</h2>
 
         <form onSubmit={handleGenerate} className="space-y-4">
-          {/* Drop zone */}
+
+          {/* URL input */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide">
+              Image URL
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={handleUrlChange}
+              placeholder="https://example.com/image.jpg"
+              disabled={!!file}
+              className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
+            <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">or upload a file</span>
+            <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
+          </div>
+
+          {/* File drop zone */}
           <div
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
-            onClick={() => inputRef.current?.click()}
-            className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors min-h-[140px] ${
-              dragging
-                ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
-                : "border-zinc-300 dark:border-zinc-700 hover:border-indigo-400 dark:hover:border-indigo-600 bg-white dark:bg-zinc-800"
+            onClick={() => !imageUrl && inputRef.current?.click()}
+            className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition-colors min-h-[130px] ${
+              imageUrl
+                ? "opacity-40 cursor-not-allowed border-zinc-200 dark:border-zinc-700"
+                : dragging
+                ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 cursor-copy"
+                : "border-zinc-300 dark:border-zinc-700 hover:border-indigo-400 dark:hover:border-indigo-600 bg-white dark:bg-zinc-800 cursor-pointer"
             }`}
           >
-            {previewUrl ? (
+            {previewSrc && file ? (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={previewUrl} alt="Preview" className="max-h-64 w-full object-contain rounded-xl p-1" />
+              <img src={previewSrc} alt="Preview" className="max-h-56 w-full object-contain rounded-xl p-1" />
             ) : (
               <>
-                <svg className="w-8 h-8 text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg className="w-7 h-7 text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
                 </svg>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">Drop an image or click to browse</p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">JPEG, PNG, WebP, GIF, HEIC</p>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+                  {file ? file.name : "Drop an image or click to browse"}
+                </p>
+                {!file && <p className="text-xs text-zinc-400 dark:text-zinc-500">JPEG · PNG · WebP · GIF · HEIC</p>}
               </>
             )}
 
-            {/* Loading overlay */}
             {generating && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-900/50 backdrop-blur-sm rounded-xl">
                 <LoadingSpinner large />
@@ -202,14 +251,19 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
               </div>
             )}
 
-            <input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPTED}
-              className="hidden"
-              onChange={handleFileInput}
-            />
+            <input ref={inputRef} type="file" accept={ACCEPTED} className="hidden" onChange={handleFileInput} />
           </div>
+
+          {/* Clear file */}
+          {file && (
+            <button
+              type="button"
+              onClick={() => { setFile(null); setPreviewSrc(""); if (inputRef.current) inputRef.current.value = ""; }}
+              className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+            >
+              ✕ Remove file
+            </button>
+          )}
 
           {error && (
             <div className="px-3 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
@@ -219,7 +273,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
 
           <button
             type="submit"
-            disabled={generating || !file}
+            disabled={!canGenerate}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-all active:scale-[0.97]"
           >
             {generating ? (
@@ -258,7 +312,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
               <svg className="w-6 h-6 text-zinc-400 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
             <p className="font-medium text-zinc-600 dark:text-zinc-400">No captions yet</p>
-            <p className="text-sm text-zinc-400 dark:text-zinc-600 mt-0.5">Upload an image above to generate captions</p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-600 mt-0.5">Paste a URL or upload an image above</p>
           </div>
         ) : (
           <div className="space-y-2.5">
