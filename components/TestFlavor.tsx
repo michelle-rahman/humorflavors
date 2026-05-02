@@ -108,14 +108,33 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ imageId, humorFlavorId: flavor.id }),
       });
-      const captionJson = await captionRes.json().catch(() => null);
       if (!captionRes.ok) {
-        const msg = (captionJson as Record<string,string>)?.message ?? captionRes.statusText;
-        throw new Error(`Step 4 failed (${captionRes.status}): ${msg}`);
+        const errText = await captionRes.text().catch(() => captionRes.statusText);
+        throw new Error(`Step 4 failed (${captionRes.status}): ${errText.slice(0, 300)}`);
       }
-      const newCaptions: Caption[] = Array.isArray(captionJson)
-        ? captionJson
-        : (captionJson as {captions?: Caption[]})?.captions ?? [captionJson as Caption];
+
+      const rawText = await captionRes.text();
+      let newCaptions: Caption[];
+      try {
+        const parsed = JSON.parse(rawText);
+        newCaptions = Array.isArray(parsed)
+          ? parsed
+          : (parsed as { captions?: Caption[] }).captions ?? [parsed as Caption];
+      } catch {
+        // API returned plain text — wrap it as a single caption
+        newCaptions = [{
+          id: crypto.randomUUID(),
+          content: rawText,
+          humor_flavor_id: flavor.id,
+          image_id: null as unknown as string,
+          caption_request_id: null as unknown as number,
+          is_public: false,
+          profile_id: "",
+          like_count: 0,
+          created_datetime_utc: new Date().toISOString(),
+          modified_datetime_utc: new Date().toISOString(),
+        }];
+      }
       setResult(newCaptions);
       setCaptions([...newCaptions, ...captions]);
     } catch (err: unknown) {
