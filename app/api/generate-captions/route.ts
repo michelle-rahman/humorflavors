@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const MODEL_FALLBACK = "claude-haiku-4-5-20251001";
-
-function resolveModel(providerModelId: string): string {
-  // Map provider model IDs to Anthropic model IDs
-  if (providerModelId?.toLowerCase().includes("haiku")) return "claude-haiku-4-5-20251001";
-  if (providerModelId?.toLowerCase().includes("sonnet")) return "claude-sonnet-4-6";
-  if (providerModelId?.toLowerCase().includes("opus")) return "claude-opus-4-7";
-  if (providerModelId?.toLowerCase().includes("gpt")) return MODEL_FALLBACK; // fall back for OpenAI models
-  return providerModelId || MODEL_FALLBACK;
-}
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 function injectContext(prompt: string, context: Record<string, string>): string {
   let result = prompt;
@@ -25,9 +12,9 @@ function injectContext(prompt: string, context: Record<string, string>): string 
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json(
-      { message: "ANTHROPIC_API_KEY is not configured on the server." },
+      { message: "GEMINI_API_KEY is not set. Add it to your environment variables." },
       { status: 500 }
     );
   }
@@ -64,15 +51,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Request must include humor_flavor_id and image_url" }, { status: 400 });
   }
 
-  // Fetch steps for this flavor, ordered
+  // Fetch steps ordered by order_by
   const { data: steps, error: stepsError } = await supabase
     .from("humor_flavor_steps")
-    .select(`
-      *,
-      llm_models ( provider_model_id, is_temperature_supported ),
-      llm_input_types ( slug ),
-      llm_output_types ( slug )
-    `)
+    .select(`*, llm_input_types ( slug )`)
     .eq("humor_flavor_id", humor_flavor_id)
     .order("order_by", { ascending: true });
 
@@ -80,55 +62,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: stepsError.message }, { status: 500 });
   }
   if (!steps || steps.length === 0) {
-    return NextResponse.json({ message: "This flavor has no steps. Add at least one step before testing." }, { status: 422 });
+    return NextResponse.json(
+      { message: "This flavor has no steps. Add at least one step before testing." },
+      { status: 422 }
+    );
   }
 
-  // Run the prompt chain
-  let chainOutput = "";
+  // Fetch the image as base64 for Gemini inline data
+  let imageBase64: string | null = null;
+  let imageMimeType = "image/jpeg";
+  try {
+    const imgRes = await fetch(image_url);
+    if (imgRes.ok) {
+      const ct = imgRes.headers.get("content-type") ?? "image/jpeg";
+      imageMimeType = ct.split(";")[0].trim();
+      const buf = await imgRes.arrayBuffer();
+      imageBase64 = Buffer.from(buf).toString("base64");
+    }
+  } catch {
+    // fall back to URL-only text reference if image can't be fetched
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
   const context: Record<string, string> = { image_url, imageUrl: image_url };
+  let chainOutput = "";
 
   try {
     for (const step of steps) {
-      const modelId = resolveModel(step.llm_models?.provider_model_id ?? "");
       const systemPrompt = injectContext(step.llm_system_prompt ?? "", context);
       const userPromptText = injectContext(step.llm_user_prompt ?? "", context);
       const inputSlug: string = step.llm_input_types?.slug ?? "";
-      const isImageInput = inputSlug.toLowerCase().includes("image") || inputSlug.toLowerCase().includes("vision");
+      const isImageStep = inputSlug.toLowerCase().includes("image") || inputSlug.toLowerCase().includes("vision");
 
-      // Build message content: include previous chain output if available
-      type ContentBlock =
-        | { type: "text"; text: string }
-        | { type: "image"; source: { type: "url"; url: string } };
-
-      const contentBlocks: ContentBlock[] = [];
-
-      if (isImageInput) {
-        contentBlocks.push({ type: "image", source: { type: "url", url: image_url } });
-      }
-
-      const userText = [
+      const fullPrompt = [
+        systemPrompt,
         userPromptText,
-        chainOutput ? `\n\nPrevious step output:\n${chainOutput}` : "",
-      ].filter(Boolean).join("");
+        chainOutput ? `\nPrevious step output:\n${chainOutput}` : "",
+      ].filter(Boolean).join("\n\n");
 
-      contentBlocks.push({ type: "text", text: userText });
+      type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+      const parts: Part[] = [];
 
-      const params: Anthropic.MessageCreateParamsNonStreaming = {
-        model: modelId,
-        max_tokens: 1024,
-        messages: [{ role: "user", content: contentBlocks }],
-      };
-
-      if (systemPrompt) params.system = systemPrompt;
-      if (step.llm_temperature !== null && step.llm_models?.is_temperature_supported) {
-        params.temperature = step.llm_temperature;
+      if (isImageStep && imageBase64) {
+        parts.push({ inlineData: { mimeType: imageMimeType, data: imageBase64 } });
       }
+      parts.push({ text: fullPrompt });
 
-      const response = await anthropic.messages.create(params);
-      chainOutput = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n");
+      const result = await model.generateContent(parts);
+      chainOutput = result.response.text();
 
       context.previousOutput = chainOutput;
       context.step_output = chainOutput;
@@ -138,7 +121,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: msg }, { status: 502 });
   }
 
-  // Return as caption array matching the Caption type shape
   const caption = {
     id: crypto.randomUUID(),
     content: chainOutput,
