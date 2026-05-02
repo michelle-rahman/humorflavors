@@ -21,6 +21,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
   const [stepLabel, setStepLabel] = useState("");
   const [captions, setCaptions] = useState(existingCaptions);
   const [result, setResult] = useState<Caption[] | null>(null);
+  const [imageDescription, setImageDescription] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +63,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
     setGenerating(true);
     setError("");
     setResult(null);
+    setImageDescription(null);
 
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
@@ -160,6 +162,15 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
       }
       setResult(newCaptions);
       setCaptions([...newCaptions, ...captions]);
+
+      // Fetch the image description the pipeline stored on the image record
+      const { data: imgRecord } = await supabase
+        .from("images")
+        .select("image_description")
+        .eq("id", imageId)
+        .single();
+      if (imgRecord?.image_description) setImageDescription(imgRecord.image_description);
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     }
@@ -286,7 +297,17 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
 
         {/* Fresh results */}
         {result && result.length > 0 && (
-          <div className="space-y-2 animate-slide-down">
+          <div className="space-y-3 animate-slide-down">
+            {/* Image description from intermediate step */}
+            {imageDescription && (
+              <div className="p-3.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1.5">
+                  Image description
+                </p>
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{imageDescription}</p>
+              </div>
+            )}
+
             <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
               {result.length} caption{result.length !== 1 ? "s" : ""} generated
             </p>
