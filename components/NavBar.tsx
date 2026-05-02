@@ -42,6 +42,17 @@ export function NavBar() {
         )}
 
         <div className="flex items-center gap-3 flex-shrink-0">
+          <Link
+            href="/showcase"
+            className={`text-sm font-medium transition-colors ${
+              pathname === "/showcase"
+                ? "text-indigo-600 dark:text-indigo-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            Showcase
+          </Link>
+          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800" />
           <ThemeToggle />
           <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800" />
           <button
