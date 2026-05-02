@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import type { HumorFlavor, Caption } from "@/lib/types";
 
@@ -11,6 +12,7 @@ interface Props {
 
 export function TestFlavor({ flavor, existingCaptions }: Props) {
   const [imageUrl, setImageUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [generating, setGenerating] = useState(false);
   const [captions, setCaptions] = useState(existingCaptions);
   const [result, setResult] = useState<Caption[] | null>(null);
@@ -21,6 +23,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
     setGenerating(true);
     setError("");
     setResult(null);
+    setPreviewUrl(imageUrl.trim());
 
     try {
       const response = await fetch("/api/generate-captions", {
@@ -35,10 +38,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
       const json = await response.json();
 
       if (!response.ok) {
-        setError(
-          json?.message ||
-            `API error ${response.status}: ${response.statusText}`
-        );
+        setError(json?.message || `Error ${response.status}: ${response.statusText}`);
       } else {
         const newCaptions = Array.isArray(json) ? json : json.captions ?? [json];
         setResult(newCaptions as Caption[]);
@@ -73,10 +73,9 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
       </div>
 
       {/* Generate panel */}
-      <div className="p-5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
-        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-          Generate captions
-        </h2>
+      <div className="p-5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
+        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Generate captions</h2>
+
         <form onSubmit={handleGenerate} className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide">
@@ -112,28 +111,52 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
           )}
         </form>
 
-        {/* Fresh results */}
-        {result && result.length > 0 && (
-          <div className="mt-5 space-y-2 animate-slide-down">
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-              {result.length} new caption{result.length !== 1 ? "s" : ""} generated
-            </p>
-            {result.map((c, i) => (
-              <div key={c.id ?? i} className="p-3.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl">
-                <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">{c.content}</p>
+        {/* Image preview + results side by side when available */}
+        {previewUrl && (
+          <div className={`grid gap-4 mt-2 ${result && result.length > 0 ? "sm:grid-cols-2" : ""}`}>
+            {/* Image preview */}
+            <div className="relative w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl}
+                alt="Input image"
+                className="w-full object-cover max-h-72"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              {generating && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm rounded-xl">
+                  <div className="flex flex-col items-center gap-2 text-white">
+                    <LoadingSpinner large />
+                    <span className="text-xs font-medium">Running prompt chain…</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Fresh results */}
+            {result && result.length > 0 && (
+              <div className="space-y-2 animate-slide-down">
+                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                  {result.length} caption{result.length !== 1 ? "s" : ""} generated
+                </p>
+                {result.map((c, i) => (
+                  <div key={c.id ?? i} className="p-3.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl">
+                    <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">{c.content}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
 
       {/* Caption history */}
       <div>
-        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
-          Caption history
-        </h2>
+        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Caption history</h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-          {captions.length} caption{captions.length !== 1 ? "s" : ""} generated with this flavor
+          {captions.length} caption{captions.length !== 1 ? "s" : ""} generated this session
         </p>
 
         {captions.length === 0 ? (
@@ -148,7 +171,7 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
           <div className="space-y-2.5">
             {captions.map((c, i) => (
               <div key={c.id ?? i} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
-                <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">{c.content}</p>
+                <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">{c.content}</p>
                 <div className="flex items-center gap-3 mt-2.5">
                   <span className="text-xs text-zinc-400 dark:text-zinc-600">
                     {new Date(c.created_datetime_utc).toLocaleString(undefined, {
@@ -176,9 +199,10 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
   );
 }
 
-function LoadingSpinner() {
+function LoadingSpinner({ large }: { large?: boolean }) {
+  const cls = large ? "w-6 h-6" : "w-3.5 h-3.5";
   return (
-    <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+    <svg className={`animate-spin ${cls}`} viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
     </svg>
