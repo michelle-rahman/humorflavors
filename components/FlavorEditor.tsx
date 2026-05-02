@@ -175,150 +175,171 @@ export function FlavorEditor({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <div className="space-y-7 animate-fade-in">
+      {/* Header row */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-1">
-            <Link href="/dashboard" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+        <div className="min-w-0">
+          <nav className="flex items-center gap-1.5 text-sm text-zinc-400 dark:text-zinc-600 mb-2">
+            <Link href="/dashboard" className="hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors">
               Dashboard
             </Link>
-            <span>/</span>
-            <span className="text-zinc-900 dark:text-zinc-100 font-medium truncate max-w-xs">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>
+            <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-xs">
               {flavorData.slug}
             </span>
-          </div>
+          </nav>
           {flavorData.is_pinned && (
-            <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium">
+            <span className="inline-flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-md font-medium border border-amber-200 dark:border-amber-800/50">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
               Pinned
             </span>
           )}
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Link
             href={`/flavors/${flavorData.id}/test`}
-            className="px-3 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl transition-colors border border-emerald-200/50 dark:border-emerald-800/30"
           >
-            Test flavor
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Test
           </Link>
           <button
             onClick={() => setEditingFlavor(!editingFlavor)}
-            className="px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition-colors border border-indigo-200/50 dark:border-indigo-800/30"
           >
-            {editingFlavor ? "Cancel" : "Edit"}
+            {editingFlavor ? (
+              <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>Cancel</>
+            ) : (
+              <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>Edit</>
+            )}
           </button>
           <button
             onClick={handleDeleteFlavor}
-            className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+            className="flex items-center justify-center w-8 h-8 text-zinc-400 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+            title="Delete flavor"
           >
-            Delete
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           </button>
         </div>
       </div>
 
-      {/* Flavor Details */}
+      {/* Flavor info card */}
       {editingFlavor ? (
         <form
           onSubmit={handleSaveFlavor}
-          className="p-5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-4"
+          className="p-5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4 animate-slide-down"
         >
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-            Edit Flavor
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Edit Flavor</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide">
                 Name (slug)
               </label>
               <input
                 name="slug"
                 required
                 defaultValue={flavorData.slug}
-                className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
               />
             </div>
             <div className="flex items-end">
-              <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 cursor-pointer">
+              <label className="flex items-center gap-2.5 text-sm text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   name="is_pinned"
                   defaultChecked={flavorData.is_pinned}
-                  className="rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
+                  className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-indigo-600 focus:ring-indigo-500"
                 />
-                Pinned
+                Pin to top
               </label>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide">
               Description
             </label>
             <textarea
               name="description"
               defaultValue={flavorData.description}
               rows={3}
-              className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-shadow"
             />
           </div>
           {flavorError && (
-            <p className="text-xs text-red-500">{flavorError}</p>
+            <p className="text-xs text-red-500 dark:text-red-400">{flavorError}</p>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button
               type="submit"
               disabled={savingFlavor}
-              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-xl transition-all active:scale-[0.97]"
             >
-              {savingFlavor ? "Saving…" : "Save changes"}
+              {savingFlavor ? <><LoadingSpinner />Saving…</> : "Save changes"}
             </button>
             <button
               type="button"
               onClick={() => setEditingFlavor(false)}
-              className="px-4 py-1.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-sm rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
           </div>
         </form>
       ) : (
-        <div className="p-5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-          <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+        <div className="p-5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             {flavorData.slug}
           </h1>
           {flavorData.description && (
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
               {flavorData.description}
             </p>
           )}
-          <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-600">
-            ID: {flavorData.id} · Modified{" "}
-            {new Date(flavorData.modified_datetime_utc).toLocaleString()}
+          <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-600">
+            ID #{flavorData.id} · Last modified{" "}
+            {new Date(flavorData.modified_datetime_utc).toLocaleString(undefined, {
+              month: "short", day: "numeric", year: "numeric",
+              hour: "2-digit", minute: "2-digit",
+            })}
           </p>
         </div>
       )}
 
-      {/* Steps */}
+      {/* Steps section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-            Steps{" "}
-            <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-              ({steps.length})
-            </span>
-          </h2>
+          <div>
+            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+              Prompt Chain Steps
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              {steps.length === 0
+                ? "No steps yet"
+                : `${steps.length} step${steps.length !== 1 ? "s" : ""} · drag to reorder`}
+            </p>
+          </div>
           <button
             onClick={() => setShowAddStep(!showAddStep)}
-            className="px-3 py-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-xl transition-all active:scale-[0.97] ${
+              showAddStep
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+            }`}
           >
-            + Add step
+            {showAddStep ? (
+              <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>Cancel</>
+            ) : (
+              <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>Add step</>
+            )}
           </button>
         </div>
 
         {showAddStep && (
-          <div className="mb-4 p-4 bg-zinc-50 dark:bg-zinc-900 border border-dashed border-indigo-300 dark:border-indigo-700 rounded-xl">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
-              New Step
-            </h3>
+          <div className="mb-4 p-5 bg-zinc-50 dark:bg-zinc-900 border-2 border-dashed border-indigo-300 dark:border-indigo-700/50 rounded-2xl animate-slide-down">
+            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-4">
+              New Step #{steps.length + 1}
+            </p>
             <StepForm
               humorFlavorId={flavorData.id}
               orderBy={steps.length + 1}
@@ -333,8 +354,12 @@ export function FlavorEditor({
         )}
 
         {steps.length === 0 && !showAddStep ? (
-          <div className="text-center py-10 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 dark:text-zinc-600">
-            <p>No steps yet. Add one to define the prompt chain.</p>
+          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center">
+            <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center mb-3">
+              <svg className="w-6 h-6 text-zinc-400 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+            </div>
+            <p className="font-medium text-zinc-600 dark:text-zinc-400">No steps yet</p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-600 mt-0.5">Add a step to build your prompt chain</p>
           </div>
         ) : (
           <DndContext
@@ -346,7 +371,7 @@ export function FlavorEditor({
               items={steps.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {steps.map((step) => (
                   <SortableStep
                     key={step.id}
@@ -370,5 +395,14 @@ export function FlavorEditor({
         )}
       </div>
     </div>
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+    </svg>
   );
 }

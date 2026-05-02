@@ -101,61 +101,42 @@ export function StepForm({
     setSaving(false);
   }
 
+  const fieldCls = "w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow";
+  const labelCls = "block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wide";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Row 1: type + description */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-            Step type
-          </label>
-          <select
-            name="humor_flavor_step_type_id"
-            defaultValue={existingStep?.humor_flavor_step_type_id ?? stepTypes[0]?.id}
-            className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <label className={labelCls}>Step type</label>
+          <select name="humor_flavor_step_type_id" defaultValue={existingStep?.humor_flavor_step_type_id ?? stepTypes[0]?.id} className={fieldCls}>
             {stepTypes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.slug} — {t.description}
-              </option>
+              <option key={t.id} value={t.id}>{t.slug} — {t.description}</option>
             ))}
           </select>
         </div>
-
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-            Description (optional)
-          </label>
-          <input
-            name="description"
-            defaultValue={existingStep?.description ?? ""}
-            placeholder="Brief step description"
-            className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+          <label className={labelCls}>Description <span className="normal-case text-zinc-400">(optional)</span></label>
+          <input name="description" defaultValue={existingStep?.description ?? ""} placeholder="Brief step description" className={fieldCls} />
         </div>
+      </div>
 
+      {/* Row 2: model + temperature */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-            LLM model
-          </label>
-          <select
-            name="llm_model_id"
-            value={selectedModelId}
-            onChange={(e) => setSelectedModelId(Number(e.target.value))}
-            className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <label className={labelCls}>LLM model</label>
+          <select name="llm_model_id" value={selectedModelId} onChange={(e) => setSelectedModelId(Number(e.target.value))} className={fieldCls}>
             {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
+              <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
         </div>
-
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+          <label className={labelCls}>
             Temperature{" "}
             {!selectedModel?.is_temperature_supported && (
-              <span className="text-zinc-400">(not supported)</span>
+              <span className="text-zinc-400 normal-case">— not supported</span>
             )}
           </label>
           <input
@@ -167,89 +148,88 @@ export function StepForm({
             defaultValue={existingStep?.llm_temperature ?? ""}
             disabled={!selectedModel?.is_temperature_supported}
             placeholder="0.7"
-            className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+            className={`${fieldCls} disabled:opacity-40 disabled:cursor-not-allowed`}
           />
         </div>
+      </div>
 
+      {/* Row 3: input + output type */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-            Input type
-          </label>
-          <select
-            name="llm_input_type_id"
-            defaultValue={existingStep?.llm_input_type_id ?? inputTypes[0]?.id}
-            className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <label className={labelCls}>Input type</label>
+          <select name="llm_input_type_id" defaultValue={existingStep?.llm_input_type_id ?? inputTypes[0]?.id} className={fieldCls}>
             {inputTypes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.description}
-              </option>
+              <option key={t.id} value={t.id}>{t.description}</option>
             ))}
           </select>
         </div>
-
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-            Output type
-          </label>
-          <select
-            name="llm_output_type_id"
-            defaultValue={existingStep?.llm_output_type_id ?? outputTypes[0]?.id}
-            className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <label className={labelCls}>Output type</label>
+          <select name="llm_output_type_id" defaultValue={existingStep?.llm_output_type_id ?? outputTypes[0]?.id} className={fieldCls}>
             {outputTypes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.description}
-              </option>
+              <option key={t.id} value={t.id}>{t.description}</option>
             ))}
           </select>
         </div>
       </div>
 
+      {/* Prompts */}
       <div>
-        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-          System prompt
-        </label>
+        <label className={labelCls}>System prompt</label>
         <textarea
           name="llm_system_prompt"
           defaultValue={existingStep?.llm_system_prompt ?? ""}
           rows={4}
           placeholder="You are a helpful assistant…"
-          className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono"
+          className={`${fieldCls} resize-none font-mono text-xs leading-relaxed`}
         />
       </div>
-
       <div>
-        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-          User prompt
-        </label>
+        <label className={labelCls}>User prompt</label>
         <textarea
           name="llm_user_prompt"
           defaultValue={existingStep?.llm_user_prompt ?? ""}
           rows={4}
           placeholder="Describe what you see in this image…"
-          className="w-full px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono"
+          className={`${fieldCls} resize-none font-mono text-xs leading-relaxed`}
         />
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && (
+        <div className="px-3 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 pt-1">
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-xl transition-all active:scale-[0.97]"
         >
-          {saving ? "Saving…" : existingStep ? "Save changes" : "Add step"}
+          {saving ? (
+            <><LoadingSpinner />{existingStep ? "Saving…" : "Adding…"}</>
+          ) : (
+            existingStep ? "Save changes" : "Add step"
+          )}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-sm rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
         >
           Cancel
         </button>
       </div>
     </form>
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+    </svg>
   );
 }

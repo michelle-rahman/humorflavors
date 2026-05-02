@@ -48,7 +48,8 @@ export function SortableStep({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : undefined,
   };
 
   const model = models.find((m) => m.id === step.llm_model_id);
@@ -60,106 +61,113 @@ export function SortableStep({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden"
+      className={`bg-white dark:bg-zinc-900 border rounded-2xl overflow-hidden transition-shadow ${
+        isDragging
+          ? "border-indigo-400 dark:border-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/30"
+          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+      }`}
     >
       <div className="flex items-start gap-3 p-4">
-        {/* Drag handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 p-1 -m-1 rounded"
-          title="Drag to reorder"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        {/* Step number + drag handle */}
+        <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-0.5">
+          <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-bold">
+            {step.order_by}
+          </div>
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 p-0.5 rounded transition-colors"
+            title="Drag to reorder"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+              <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+              <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+            </svg>
+          </button>
         </div>
 
+        {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-1.5 py-0.5 rounded">
-              Step {step.order_by}
-            </span>
+          <div className="flex items-center flex-wrap gap-1.5 mb-1.5">
             {stepType && (
-              <span className="text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md font-medium">
                 {stepType.slug}
               </span>
             )}
             {model && (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="text-xs bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 px-2 py-0.5 rounded-md border border-violet-200/50 dark:border-violet-800/30">
                 {model.name}
+              </span>
+            )}
+            {inputType && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {inputType.description}
+              </span>
+            )}
+            {outputType && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">→ {outputType.description}</span>
+            )}
+            {step.llm_temperature !== null && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                temp {step.llm_temperature}
               </span>
             )}
           </div>
 
           {step.description && (
-            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-1">
+            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-2">
               {step.description}
             </p>
           )}
 
-          <div className="flex flex-wrap gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {inputType && <span>Input: {inputType.description}</span>}
-            {outputType && <span>Output: {outputType.description}</span>}
-            {step.llm_temperature !== null && (
-              <span>Temp: {step.llm_temperature}</span>
-            )}
-          </div>
-
           {!isEditing && (
-            <div className="mt-2 space-y-1">
+            <div className="space-y-1.5">
               {step.llm_system_prompt && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
-                    System prompt
-                  </summary>
-                  <pre className="mt-1 p-2 bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-sans">
-                    {step.llm_system_prompt}
-                  </pre>
-                </details>
+                <PromptPreview label="System" content={step.llm_system_prompt} />
               )}
               {step.llm_user_prompt && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
-                    User prompt
-                  </summary>
-                  <pre className="mt-1 p-2 bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-sans">
-                    {step.llm_user_prompt}
-                  </pre>
-                </details>
+                <PromptPreview label="User" content={step.llm_user_prompt} />
               )}
             </div>
           )}
         </div>
 
-        <div className="flex-shrink-0 flex gap-1">
+        {/* Actions */}
+        <div className="flex-shrink-0 flex gap-1 pt-0.5">
           <button
             onClick={onEdit}
-            className="px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors"
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              isEditing
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                : "text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200/50 dark:border-indigo-800/30"
+            }`}
           >
-            {isEditing ? "Cancel" : "Edit"}
+            {isEditing ? (
+              <>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                Cancel
+              </>
+            ) : (
+              <>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+                Edit
+              </>
+            )}
           </button>
           <button
             onClick={onDelete}
-            className="px-2.5 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md transition-colors"
+            className="flex items-center justify-center w-7 h-7 text-zinc-400 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            title="Delete step"
           >
-            Delete
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           </button>
         </div>
       </div>
 
+      {/* Inline edit form */}
       {isEditing && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800 p-4">
+        <div className="border-t border-zinc-100 dark:border-zinc-800 p-4 bg-zinc-50 dark:bg-zinc-950/50 animate-slide-down">
           <StepForm
             humorFlavorId={step.humor_flavor_id}
             orderBy={step.order_by}
@@ -174,5 +182,22 @@ export function SortableStep({
         </div>
       )}
     </div>
+  );
+}
+
+function PromptPreview({ label, content }: { label: string; content: string }) {
+  return (
+    <details className="group/details">
+      <summary className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer select-none list-none transition-colors">
+        <svg className="w-3 h-3 transition-transform group-open/details:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 18 6-6-6-6"/></svg>
+        <span className="font-medium">{label} prompt</span>
+        <span className="text-zinc-300 dark:text-zinc-700 truncate max-w-[200px]">
+          — {content.slice(0, 60)}{content.length > 60 ? "…" : ""}
+        </span>
+      </summary>
+      <pre className="mt-2 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+        {content}
+      </pre>
+    </details>
   );
 }
