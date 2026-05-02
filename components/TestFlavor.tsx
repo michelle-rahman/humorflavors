@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import type { HumorFlavor, Caption } from "@/lib/types";
 
 interface Props {
@@ -16,7 +15,6 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
   const [captions, setCaptions] = useState(existingCaptions);
   const [result, setResult] = useState<Caption[] | null>(null);
   const [error, setError] = useState("");
-  const supabase = createClient();
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -24,30 +22,15 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
     setError("");
     setResult(null);
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-
-    if (!token) {
-      setError("Not authenticated. Please sign in again.");
-      setGenerating(false);
-      return;
-    }
-
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/caption-requests`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            humor_flavor_id: flavor.id,
-            image_url: imageUrl.trim(),
-          }),
-        }
-      );
+      const response = await fetch("/api/generate-captions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          humor_flavor_id: flavor.id,
+          image_url: imageUrl.trim(),
+        }),
+      });
 
       const json = await response.json();
 
