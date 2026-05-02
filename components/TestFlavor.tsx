@@ -62,53 +62,60 @@ export function TestFlavor({ flavor, existingCaptions }: Props) {
 
     try {
       // Step 1: Get presigned upload URL
-      setStepLabel("Getting upload URL…");
+      setStepLabel("Step 1/4 — Getting upload URL…");
       const presignRes = await fetch(`${API}/pipeline/generate-presigned-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ contentType: file.type }),
+        body: JSON.stringify({ contentType: file.type || "image/jpeg" }),
       });
+      const presignJson = await presignRes.json().catch(() => ({})) as Record<string, string>;
       if (!presignRes.ok) {
-        const j = await presignRes.json().catch(() => ({}));
-        throw new Error(`Presign failed (${presignRes.status}): ${j.message ?? presignRes.statusText}`);
+        throw new Error(`Step 1 failed (${presignRes.status}): ${presignJson.message ?? presignRes.statusText}`);
       }
-      const { presignedUrl, cdnUrl } = await presignRes.json();
+      const { presignedUrl, cdnUrl } = presignJson;
+      if (!presignedUrl || !cdnUrl) throw new Error("Step 1: API did not return presignedUrl/cdnUrl");
 
-      // Step 2: Upload image bytes to S3
-      setStepLabel("Uploading image…");
+      // Step 2: Upload image bytes directly to S3
+      setStepLabel("Step 2/4 — Uploading image…");
       const uploadRes = await fetch(presignedUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type },
+        headers: { "Content-Type": file.type || "image/jpeg" },
         body: file,
       });
-      if (!uploadRes.ok) throw new Error(`Upload failed (${uploadRes.status})`);
+      if (!uploadRes.ok) {
+        const body = await uploadRes.text().catch(() => "");
+        throw new Error(`Step 2 (S3 upload) failed (${uploadRes.status}): ${body.slice(0, 200)}`);
+      }
 
-      // Step 3: Register image URL with pipeline
-      setStepLabel("Registering image…");
+      // Step 3: Register image with pipeline
+      setStepLabel("Step 3/4 — Registering image…");
       const regRes = await fetch(`${API}/pipeline/upload-image-from-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ imageUrl: cdnUrl, isCommonUse: false }),
       });
+      const regJson = await regRes.json().catch(() => ({})) as Record<string, string>;
       if (!regRes.ok) {
-        const j = await regRes.json().catch(() => ({}));
-        throw new Error(`Register failed (${regRes.status}): ${j.message ?? regRes.statusText}`);
+        throw new Error(`Step 3 failed (${regRes.status}): ${regJson.message ?? regRes.statusText}`);
       }
-      const { imageId } = await regRes.json();
+      const imageId = regJson.imageId;
+      if (!imageId) throw new Error("Step 3: API did not return imageId");
 
-      // Step 4: Generate captions
-      setStepLabel("Generating captions…");
+      // Step 4: Generate captions for this flavor
+      setStepLabel("Step 4/4 — Generating captions…");
       const captionRes = await fetch(`${API}/pipeline/generate-captions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ imageId, humorFlavorId: flavor.id }),
       });
+      const captionJson = await captionRes.json().catch(() => null);
       if (!captionRes.ok) {
-        const j = await captionRes.json().catch(() => ({}));
-        throw new Error(`Caption generation failed (${captionRes.status}): ${j.message ?? captionRes.statusText}`);
+        const msg = (captionJson as Record<string,string>)?.message ?? captionRes.statusText;
+        throw new Error(`Step 4 failed (${captionRes.status}): ${msg}`);
       }
-      const data = await captionRes.json();
-      const newCaptions: Caption[] = Array.isArray(data) ? data : data.captions ?? [data];
+      const newCaptions: Caption[] = Array.isArray(captionJson)
+        ? captionJson
+        : (captionJson as {captions?: Caption[]})?.captions ?? [captionJson as Caption];
       setResult(newCaptions);
       setCaptions([...newCaptions, ...captions]);
     } catch (err: unknown) {
